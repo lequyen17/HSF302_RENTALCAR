@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Customers - FUCarRentingSystem</title>
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+	<div class="container">
+		<a class="navbar-brand" th:href="@{/}">FUCarRentingSystem</a>
+		<ul class="navbar-nav me-auto" th:if="${session.role == 'Admin'}">
+			<li class="nav-item"><a class="nav-link" th:href="@{/admin/cars}">Cars</a></li>
+			<li class="nav-item"><a class="nav-link" th:href="@{/admin/customers}">Customers</a></li>
+			<li class="nav-item"><a class="nav-link" th:href="@{/admin/rentals}">Rentals</a></li>
+			<li class="nav-item"><a class="nav-link" th:href="@{/admin/reports}">Report</a></li>
+		</ul>
+		<ul class="navbar-nav me-auto" th:if="${session.role == 'Customer'}">
+			<li class="nav-item"><a class="nav-link" th:href="@{/customer/rent}">Rent a car</a></li>
+			<li class="nav-item"><a class="nav-link" th:href="@{/customer/history}">History</a></li>
+			<li class="nav-item"><a class="nav-link" th:href="@{/customer/profile}">Profile</a></li>
+		</ul>
+		<ul class="navbar-nav ms-auto" th:if="${session.role != null}">
+			<li class="nav-item"><span class="navbar-text me-3"
+				th:text="${session.displayName} + ' (' + ${session.role} + ')'"></span></li>
+			<li class="nav-item"><a class="nav-link" th:href="@{/logout}">Logout</a></li>
+		</ul>
+	</div>
+</nav>
+<div class="container">
+	<div class="d-flex justify-content-between align-items-center mb-3">
+		<h3>Customer management</h3>
+		<a class="btn btn-primary" th:href="@{/admin/customers/new}">+ New customer</a>
+	</div>
+		<div class="alert alert-success" th:if="${message}" th:text="${message}"></div>
+		<div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
+	<form class="row g-2 mb-3" th:action="@{/admin/customers}" method="get">
+		<div class="col-auto"><input class="form-control" name="keyword" th:value="${keyword}" placeholder="Search by name"></div>
+		<div class="col-auto"><button class="btn btn-outline-secondary">Search</button></div>
+	</form>
+	<table class="table table-striped align-middle">
+		<thead><tr><th>ID</th><th>Full name</th><th>Email</th><th>Mobile</th><th>Birthday</th>
+			<th>Identity card</th><th>Licence</th><th></th></tr></thead>
+		<tbody>
+		<tr th:each="c : ${customers}">
+			<td th:text="${c.customerId}"></td>
+			<td th:text="${c.fullName}"></td>
+			<td th:text="${c.email}"></td>
+			<td th:text="${c.mobile}"></td>
+			<td th:text="${c.birthday}"></td>
+			<td th:text="${c.identityCard}"></td>
+			<td th:text="${c.licenceNumber} + ' (' + ${c.licenceDate} + ')'"></td>
+			<td class="text-nowrap">
+				<a class="btn btn-sm btn-outline-primary" th:href="@{/admin/customers/edit/{id}(id=${c.customerId})}">Edit</a>
+				<form class="d-inline" th:action="@{/admin/customers/delete/{id}(id=${c.customerId})}" method="post"
+					onsubmit="return confirm('Delete this customer?');">
+					<button class="btn btn-sm btn-outline-danger">Delete</button>
+				</form>
+			</td>
+		</tr>
+		<tr th:if="${#lists.isEmpty(customers)}"><td colspan="8" class="text-center text-muted">No customers</td></tr>
+		</tbody>
+	</table>
+</div>
+</body>
+</html>
