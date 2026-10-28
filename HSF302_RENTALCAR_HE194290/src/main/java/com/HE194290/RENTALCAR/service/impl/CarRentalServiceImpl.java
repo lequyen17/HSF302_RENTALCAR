@@ -1,10 +1,10 @@
 package com.HE194290.RENTALCAR.service.impl;
 
 import com.HE194290.RENTALCAR.dto.response.CarRentalResponse;
+import com.HE194290.RENTALCAR.dto.response.ReportResponse;
 import com.HE194290.RENTALCAR.entity.Car;
 import com.HE194290.RENTALCAR.entity.CarRental;
 import com.HE194290.RENTALCAR.entity.Customer;
-import com.HE194290.RENTALCAR.entity.Review;
 import com.HE194290.RENTALCAR.repository.CarRentalRepository;
 import com.HE194290.RENTALCAR.repository.CarRepository;
 import com.HE194290.RENTALCAR.repository.CustomerRepository;
@@ -19,9 +19,15 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Tình trạng "xe đang được thuê" không lưu ở Car.status mà được suy ra từ các giao dịch chưa hủy theo khoảng ngày,
+ * nên cùng một xe vẫn thuê được ở những khoảng ngày không trùng nhau.
+ */
 @Service
 @Transactional
 public class CarRentalServiceImpl implements CarRentalService {
+
+	private static final int NO_RENTAL = -1;
 
 	private final CarRentalRepository rentalRepository;
 	private final CarRepository carRepository;
@@ -55,18 +61,37 @@ public class CarRentalServiceImpl implements CarRentalService {
 		return toDto(find(id));
 	}
 
-	/** Báo cáo theo khoảng ngày nhận xe StartDate -> EndDate, sắp xếp giảm dần. */
 	@Override
 	@Transactional(readOnly = true)
-	public List<CarRentalResponse> report(LocalDate start, LocalDate end) {
+	public ReportResponse report(LocalDate start, LocalDate end) {
 		if (start == null || end == null) {
 			throw new IllegalArgumentException("Start date and end date are required");
 		}
 		if (end.isBefore(start)) {
 			throw new IllegalArgumentException("End date must not be before start date");
 		}
-		return rentalRepository.findByPickupDateBetweenOrderByPickupDateDesc(start, end).stream().map(this::toDto)
-				.toList();
+		List<CarRental> all = rentalRepository.findByPickupDateBetweenOrderByPickupDateDesc(start, end);
+		List<CarRental> billable = all.stream().filter(r -> !CarRental.CANCELLED.equals(r.getStatus())).toList();
+
+		ReportResponse res = new ReportResponse();
+		res.setStartDate(start);
+		res.setEndDate(end);
+		res.setRentals(all.stream().map(this::toDto).toList());
+		res.setRevenue(billable.stream().map(CarRental::getRentPrice).reduce(BigDecimal.ZERO, BigDecimal::add));
+		res.setActiveCount(all.stream().filter(r -> CarRental.ACTIVE.equals(r.getStatus())).count());
+		res.setCompletedCount(all.stream().filter(r -> CarRental.COMPLETED.equals(r.getStatus())).count());
+		res.setCancelledCount(all.stream().filter(r -> CarRental.CANCELLED.equals(r.getStatus())).count());
+		return res;
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public boolean isCarAvailable(Integer carId, LocalDate start, LocalDate end) {
+		Car car = carRepository.findById(carId).orElse(null);
+		if (car == null || Car.INACTIVE.equals(car.getStatus())) {
+			return false;
+		}
+		return !rentalRepository.existsOverlap(carId, start, end, NO_RENTAL);
 	}
 
 	/** Một khách thuê nhiều xe: mỗi xe là một dòng car_rental cùng khoảng ngày. */
@@ -86,8 +111,12 @@ public class CarRentalServiceImpl implements CarRentalService {
 		for (Integer carId : carIds.stream().distinct().toList()) {
 			Car car = carRepository.findById(carId)
 					.orElseThrow(() -> new IllegalArgumentException("Car not found: " + carId));
-			if (!Car.AVAILABLE.equals(car.getStatus())) {
-				throw new IllegalArgumentException("Car '" + car.getCarName() + "' is not available");
+			if (Car.INACTIVE.equals(car.getStatus())) {
+				throw new IllegalArgumentException("Car '" + car.getCarName() + "' is not available for rent");
+			}
+			if (rentalRepository.existsOverlap(carId, pickup, ret, NO_RENTAL)) {
+				throw new IllegalArgumentException(
+						"Car '" + car.getCarName() + "' is already booked between " + pickup + " and " + ret);
 			}
 			CarRental r = new CarRental();
 			r.setCustomer(customer);
@@ -96,8 +125,6 @@ public class CarRentalServiceImpl implements CarRentalService {
 			r.setReturnDate(ret);
 			r.setRentPrice(price(car, pickup, ret));
 			r.setStatus(CarRental.ACTIVE);
-			car.setStatus(Car.RENTED);
-			carRepository.save(car);
 			result.add(toDto(rentalRepository.save(r)));
 		}
 		return result;
@@ -110,11 +137,15 @@ public class CarRentalServiceImpl implements CarRentalService {
 			throw new IllegalArgumentException("Invalid status");
 		}
 		CarRental r = find(id);
+		if (!CarRental.CANCELLED.equals(status)
+				&& rentalRepository.existsOverlap(r.getCar().getCarId(), pickup, ret, id)) {
+			throw new IllegalArgumentException(
+					"Car '" + r.getCar().getCarName() + "' is already booked between " + pickup + " and " + ret);
+		}
 		r.setPickupDate(pickup);
 		r.setReturnDate(ret);
 		r.setRentPrice(price(r.getCar(), pickup, ret));
 		r.setStatus(status);
-		syncCarStatus(r);
 		return toDto(rentalRepository.save(r));
 	}
 
@@ -129,7 +160,6 @@ public class CarRentalServiceImpl implements CarRentalService {
 			throw new IllegalStateException("Only active transactions can be cancelled");
 		}
 		r.setStatus(CarRental.CANCELLED);
-		syncCarStatus(r);
 		rentalRepository.save(r);
 	}
 
@@ -137,52 +167,7 @@ public class CarRentalServiceImpl implements CarRentalService {
 	public void delete(Integer id) {
 		CarRental r = find(id);
 		reviewRepository.deleteAll(reviewRepository.findByCarRentalCarRentId(id));
-		if (CarRental.ACTIVE.equals(r.getStatus())) {
-			r.setStatus(CarRental.CANCELLED);
-			syncCarStatus(r);
-		}
 		rentalRepository.delete(r);
-	}
-
-	@Override
-	public void addReview(Integer rentId, Integer customerId, int star, String comment) {
-		CarRental r = find(rentId);
-		if (!r.getCustomer().getCustomerId().equals(customerId)) {
-			throw new IllegalArgumentException("This transaction does not belong to you");
-		}
-		if (!CarRental.COMPLETED.equals(r.getStatus())) {
-			throw new IllegalStateException("You can only review completed transactions");
-		}
-		if (reviewRepository.existsByCarRentalCarRentId(rentId)) {
-			throw new IllegalStateException("This transaction has already been reviewed");
-		}
-		if (star < 1 || star > 5) {
-			throw new IllegalArgumentException("Star rating must be 1-5");
-		}
-		if (comment == null || comment.isBlank() || comment.length() > 500) {
-			throw new IllegalArgumentException("Comment is required (max 500 characters)");
-		}
-		Review review = new Review();
-		review.setCarRental(r);
-		review.setReviewStar(star);
-		review.setComment(comment.trim());
-		reviewRepository.save(review);
-	}
-
-	@Override
-	@Transactional(readOnly = true)
-	public boolean isReviewed(Integer rentId) {
-		return reviewRepository.existsByCarRentalCarRentId(rentId);
-	}
-
-	/** Xe đang Rented khi giao dịch Active; trả về Available khi giao dịch kết thúc (trừ xe đã Inactive). */
-	private void syncCarStatus(CarRental r) {
-		Car car = r.getCar();
-		if (Car.INACTIVE.equals(car.getStatus())) {
-			return;
-		}
-		car.setStatus(CarRental.ACTIVE.equals(r.getStatus()) ? Car.RENTED : Car.AVAILABLE);
-		carRepository.save(car);
 	}
 
 	private void validateDates(LocalDate pickup, LocalDate ret) {

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('My reviews')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar('myreviews')}"></nav>
+<main class="container" style="max-width: 900px;">
+	<h3 class="page-title mb-1">My reviews</h3>
+	<p class="page-sub">You can review a car once the rental is completed. Reviews can be edited or deleted at any time.</p>
+	<div th:replace="~{fragments/layout :: alerts}"></div>
+
+	<div class="card mb-3" th:each="r : ${reviews}">
+		<div class="card-body">
+			<div class="d-flex justify-content-between align-items-start">
+				<div>
+					<a th:href="@{/cars/{id}(id=${r.carId})}" class="fw-semibold fs-5 text-decoration-none" th:text="${r.carName}"></a>
+					<div><span th:replace="~{fragments/layout :: stars(${r.reviewStar})}"></span>
+						<span class="text-muted small ms-2" th:text="'Rental #' + ${r.carRentId}"></span></div>
+				</div>
+				<div class="d-flex gap-2">
+					<a class="btn btn-sm btn-outline-primary" th:href="@{/customer/reviews/{id}/edit(id=${r.id})}">Edit</a>
+					<form th:action="@{/customer/reviews/{id}/delete(id=${r.id})}" method="post"
+						onsubmit="return confirm('Delete this review?');">
+						<button class="btn btn-sm btn-outline-danger">Delete</button>
+					</form>
+				</div>
+			</div>
+			<p class="mb-0 mt-2" th:text="${r.comment}"></p>
+		</div>
+	</div>
+	<div class="card" th:if="${#lists.isEmpty(reviews)}"><div class="card-body text-center text-muted py-5">
+		You have not written any reviews yet. Go to <a th:href="@{/customer/history}">My rentals</a> to review a completed rental.
+	</div></div>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

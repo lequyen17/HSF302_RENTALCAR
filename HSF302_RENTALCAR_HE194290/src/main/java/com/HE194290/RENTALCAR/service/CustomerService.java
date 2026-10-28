@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface CustomerService {
 
-	List<CustomerResponse> search(String keyword);
+	List<CustomerResponse> findAll();
 
 	CustomerResponse get(Integer id);
 

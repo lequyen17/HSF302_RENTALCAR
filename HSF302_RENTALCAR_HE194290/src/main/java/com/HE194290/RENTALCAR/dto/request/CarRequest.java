@@ -44,6 +44,9 @@ public class CarRequest {
 	@Digits(integer = 8, fraction = 2)
 	private BigDecimal rentPrice;
 
+	@Size(max = 500)
+	private String imageUrl;
+
 	@NotBlank(message = "Status is required")
 	private String status;
 
@@ -65,6 +68,8 @@ public class CarRequest {
 	public void setProducerId(Integer producerId) { this.producerId = producerId; }
 	public BigDecimal getRentPrice() { return rentPrice; }
 	public void setRentPrice(BigDecimal rentPrice) { this.rentPrice = rentPrice; }
+	public String getImageUrl() { return imageUrl; }
+	public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
 	public String getStatus() { return status; }
 	public void setStatus(String status) { this.status = status; }
 }

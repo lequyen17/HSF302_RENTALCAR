@@ -8,6 +8,4 @@ import java.util.List;
 public interface CarRepository extends JpaRepository<Car, Integer> {
 
 	List<Car> findByStatus(String status);
-
-	List<Car> findByCarNameContainingIgnoreCase(String keyword);
 }

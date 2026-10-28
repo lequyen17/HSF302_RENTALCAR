@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Cars')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar('home')}"></nav>
+<main class="container">
+	<form class="card card-body mb-4" th:action="@{/}" method="get">
+		<div class="row g-3 align-items-end">
+			<div class="col-md-3 col-6">
+				<label class="form-label">Pickup date</label>
+				<input type="date" name="pickupDate" th:value="${pickupDate}" class="form-control">
+			</div>
+			<div class="col-md-3 col-6">
+				<label class="form-label">Return date</label>
+				<input type="date" name="returnDate" th:value="${returnDate}" class="form-control">
+			</div>
+			<div class="col-md-3">
+				<label class="form-label">Car name</label>
+				<input type="text" name="keyword" th:value="${keyword}" class="form-control">
+			</div>
+			<div class="col-md-3 d-flex gap-2">
+				<button class="btn btn-primary flex-grow-1">Search</button>
+				<a class="btn btn-outline-secondary" th:href="@{/}">Reset</a>
+			</div>
+		</div>
+	</form>
+
+	<div th:replace="~{fragments/layout :: alerts}"></div>
+	<div class="alert alert-info" th:if="${!byDate and session.role == 'Customer'}">
+		Choose a pickup and return date to see the free cars, then tick the cars you want to rent.
+	</div>
+
+	<form th:action="@{/customer/rent}" method="post" th:with="canRent=${byDate and session.role == 'Customer'}">
+	<input type="hidden" name="pickupDate" th:value="${pickupDate}">
+	<input type="hidden" name="returnDate" th:value="${returnDate}">
+	<div class="row g-4">
+		<div class="col-lg-4 col-md-6" th:each="c : ${cars}">
+			<div class="card car-card">
+				<a th:href="@{/cars/{id}(id=${c.carId}, pickupDate=${byDate ? pickupDate : null}, returnDate=${byDate ? returnDate : null})}">
+					<div class="car-thumb">
+						<img th:if="${c.imageUrl}" th:src="${c.imageUrl}" th:alt="${c.carName}">
+						<span th:unless="${c.imageUrl}">🚗</span>
+					</div>
+				</a>
+				<label class="car-select" th:if="${canRent}">
+					<input class="form-check-input car-check" type="checkbox" name="carIds" th:value="${c.carId}"
+						th:attr="data-total=${c.rentPrice.multiply(days)}">
+					<span>Select</span>
+				</label>
+				<div class="card-body">
+					<h5 class="card-title" th:text="${c.carName}"></h5>
+					<div class="car-meta mb-2">
+						<span th:text="${c.carModelYear}"></span>
+						<span th:text="${c.capacity} + ' seats'"></span>
+						<span th:text="${c.color}"></span>
+					</div>
+					<div class="d-flex justify-content-between align-items-center">
+						<span><span class="car-price" th:text="${#numbers.formatDecimal(c.rentPrice, 0, 'COMMA', 0, 'POINT')}"></span>
+							<span class="text-muted small">/ day</span></span>
+						<a class="btn btn-sm btn-outline-primary"
+							th:href="@{/cars/{id}(id=${c.carId}, pickupDate=${byDate ? pickupDate : null}, returnDate=${byDate ? returnDate : null})}">Details</a>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="col-12" th:if="${#lists.isEmpty(cars)}">
+			<div class="card card-body text-center text-muted">No cars found.</div>
+		</div>
+	</div>
+
+	<div class="rent-bar" th:if="${canRent and !#lists.isEmpty(cars)}">
+		<div><b id="selCount">0</b> car(s) selected · <span th:text="${days} + ' day(s)'"></span> · Total <b id="sumTotal">0</b></div>
+		<button id="rentBtn" class="btn btn-primary" disabled>Confirm rental</button>
+	</div>
+	<div class="rent-bar" th:if="${byDate and session.role == null and !#lists.isEmpty(cars)}">
+		<div>Log in to rent these cars.</div>
+		<a class="btn btn-primary" th:href="@{/customer/rent(pickupDate=${pickupDate}, returnDate=${returnDate})}">Login to rent</a>
+	</div>
+	</form>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+<script>
+	(function () {
+		var boxes = document.querySelectorAll('.car-check');
+		if (!boxes.length) return;
+		var total = document.getElementById('sumTotal'), count = document.getElementById('selCount'),
+			btn = document.getElementById('rentBtn');
+		function update() {
+			var sum = 0, n = 0;
+			boxes.forEach(function (b) {
+				var card = b.closest('.car-card');
+				if (card) card.classList.toggle('selected', b.checked);
+				if (b.checked) { sum += parseFloat(b.dataset.total); n++; }
+			});
+			total.textContent = sum.toLocaleString('en-US');
+			count.textContent = n;
+			btn.disabled = n === 0;
+		}
+		boxes.forEach(function (b) { b.addEventListener('change', update); });
+		update();
+	})();
+</script>
+</body>
+</html>

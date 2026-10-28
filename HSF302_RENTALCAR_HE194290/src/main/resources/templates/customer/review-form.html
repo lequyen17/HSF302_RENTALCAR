@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Review')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar('myreviews')}"></nav>
+<main class="container" style="max-width: 640px;">
+	<h3 class="page-title mb-3" th:text="${heading}"></h3>
+	<div th:replace="~{fragments/layout :: alerts}"></div>
+	<form class="card card-body" th:action="@{${formAction}}" method="post">
+		<div class="mb-3">
+			<label class="form-label">Rating</label>
+			<select name="reviewStar" class="form-select" style="max-width: 200px;">
+				<option th:each="i : ${#numbers.sequence(5, 1, -1)}" th:value="${i}"
+					th:text="${i} + ' ★'" th:selected="${i == star}"></option>
+			</select>
+		</div>
+		<div class="mb-3">
+			<label class="form-label">Comment</label>
+			<textarea name="comment" rows="4" maxlength="500" class="form-control" required th:text="${comment}"></textarea>
+			<div class="form-text">Max 500 characters.</div>
+		</div>
+		<div>
+			<button class="btn btn-primary">Save review</button>
+			<a class="btn btn-link" th:href="@{/customer/reviews}">Cancel</a>
+		</div>
+	</form>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

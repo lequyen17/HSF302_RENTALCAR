@@ -20,9 +20,8 @@ public class AdminCustomerController {
 	}
 
 	@GetMapping
-	public String list(@RequestParam(required = false) String keyword, Model model) {
-		model.addAttribute("customers", customerService.search(keyword));
-		model.addAttribute("keyword", keyword);
+	public String list(Model model) {
+		model.addAttribute("customers", customerService.findAll());
 		return "admin/customer-list";
 	}
 

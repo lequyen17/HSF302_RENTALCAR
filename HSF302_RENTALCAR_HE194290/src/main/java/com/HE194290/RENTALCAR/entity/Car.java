@@ -12,7 +12,6 @@ import java.time.LocalDate;
 public class Car {
 
 	public static final String AVAILABLE = "Available";
-	public static final String RENTED = "Rented";
 	public static final String INACTIVE = "Inactive";
 
 	@Id
@@ -62,6 +61,10 @@ public class Car {
 	@Column(name = "rent_price", nullable = false, precision = 10, scale = 2)
 	private BigDecimal rentPrice;
 
+	@Size(max = 500)
+	@Column(name = "image_url", length = 500)
+	private String imageUrl;
+
 	@NotBlank(message = "Status is required")
 	@Column(name = "status", nullable = false, length = 10)
 	private String status = AVAILABLE;
@@ -84,6 +87,8 @@ public class Car {
 	public void setProducer(CarProducer producer) { this.producer = producer; }
 	public BigDecimal getRentPrice() { return rentPrice; }
 	public void setRentPrice(BigDecimal rentPrice) { this.rentPrice = rentPrice; }
+	public String getImageUrl() { return imageUrl; }
+	public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
 	public String getStatus() { return status; }
 	public void setStatus(String status) { this.status = status; }
 }

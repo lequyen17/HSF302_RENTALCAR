@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title th:text="${title} + ' - FUCarRentingSystem'">FUCarRentingSystem</title>
+	<link rel="stylesheet" th:href="@{/vendor/bootstrap.min.css}">
+	<link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+
+<nav th:fragment="navbar(active)" class="navbar navbar-expand navbar-dark bg-dark mb-4">
+	<div class="container">
+		<a class="navbar-brand" th:href="@{/}">FUCarRentingSystem</a>
+		<div class="navbar-collapse">
+			<ul class="navbar-nav me-auto" th:if="${session.role == 'Admin'}">
+				<li class="nav-item"><a class="nav-link" th:classappend="${active == 'dashboard'} ? 'active'" th:href="@{/admin/reports}">Dashboard</a></li>
+				<li class="nav-item"><a class="nav-link" th:classappend="${active == 'cars'} ? 'active'" th:href="@{/admin/cars}">Cars</a></li>
+				<li class="nav-item"><a class="nav-link" th:classappend="${active == 'customers'} ? 'active'" th:href="@{/admin/customers}">Customers</a></li>
+				<li class="nav-item"><a class="nav-link" th:classappend="${active == 'rentals'} ? 'active'" th:href="@{/admin/rentals}">Rentals</a></li>
+				<li class="nav-item"><a class="nav-link" th:classappend="${active == 'reviews'} ? 'active'" th:href="@{/admin/reviews}">Reviews</a></li>
+			</ul>
+			<ul class="navbar-nav me-auto" th:unless="${session.role == 'Admin'}">
+				<th:block th:if="${session.role == 'Customer'}">
+					<li class="nav-item"><a class="nav-link" th:classappend="${active == 'history'} ? 'active'" th:href="@{/customer/history}">My rentals</a></li>
+					<li class="nav-item"><a class="nav-link" th:classappend="${active == 'myreviews'} ? 'active'" th:href="@{/customer/reviews}">My reviews</a></li>
+					<li class="nav-item"><a class="nav-link" th:classappend="${active == 'profile'} ? 'active'" th:href="@{/customer/profile}">Profile</a></li>
+				</th:block>
+			</ul>
+			<ul class="navbar-nav ms-auto align-items-lg-center" th:if="${session.role != null}">
+				<li class="nav-item"><span class="navbar-text me-3 text-white-50"
+					th:text="${session.displayName} + ' (' + ${session.role} + ')'"></span></li>
+				<li class="nav-item"><a class="nav-link" th:href="@{/logout}">Logout</a></li>
+			</ul>
+			<ul class="navbar-nav ms-auto" th:if="${session.role == null}">
+				<li class="nav-item"><a class="nav-link" th:href="@{/login}">Login</a></li>
+				<li class="nav-item"><a class="nav-link" th:href="@{/register}">Register</a></li>
+			</ul>
+		</div>
+	</div>
+</nav>
+
+<div th:fragment="alerts">
+	<div class="alert alert-success" th:if="${message}" th:text="${message}"></div>
+	<div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
+</div>
+
+<span th:fragment="stars(value)" class="stars">
+	<th:block th:each="i : ${#numbers.sequence(1, 5)}"><span th:class="${i <= value} ? '' : 'off'">★</span></th:block>
+</span>
+
+<footer th:fragment="footer" class="app-footer text-center">
+	<div class="container">FUCarRentingSystem &middot; HSF302 Assignment</div>
+</footer>
+
+<!-- Chỉ các trang có bảng mới nạp DataTables -->
+<th:block th:fragment="datatables">
+	<link rel="stylesheet" th:href="@{/vendor/dataTables.bootstrap5.min.css}">
+	<script th:src="@{/vendor/jquery.min.js}"></script>
+	<script th:src="@{/vendor/dataTables.min.js}"></script>
+	<script th:src="@{/vendor/dataTables.bootstrap5.min.js}"></script>
+	<script th:src="@{/js/tables.js}"></script>
+</th:block>
+
+</body>
+</html>

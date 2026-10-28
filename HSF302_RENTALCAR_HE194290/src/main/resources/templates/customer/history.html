@@ -1,66 +1,47 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
-<head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>History - FUCarRentingSystem</title>
-	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
+<head th:replace="~{fragments/layout :: head('My rentals')}"></head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
-	<div class="container">
-		<a class="navbar-brand" th:href="@{/}">FUCarRentingSystem</a>
-		<ul class="navbar-nav me-auto" th:if="${session.role == 'Admin'}">
-			<li class="nav-item"><a class="nav-link" th:href="@{/admin/cars}">Cars</a></li>
-			<li class="nav-item"><a class="nav-link" th:href="@{/admin/customers}">Customers</a></li>
-			<li class="nav-item"><a class="nav-link" th:href="@{/admin/rentals}">Rentals</a></li>
-			<li class="nav-item"><a class="nav-link" th:href="@{/admin/reports}">Report</a></li>
-		</ul>
-		<ul class="navbar-nav me-auto" th:if="${session.role == 'Customer'}">
-			<li class="nav-item"><a class="nav-link" th:href="@{/customer/rent}">Rent a car</a></li>
-			<li class="nav-item"><a class="nav-link" th:href="@{/customer/history}">History</a></li>
-			<li class="nav-item"><a class="nav-link" th:href="@{/customer/profile}">Profile</a></li>
-		</ul>
-		<ul class="navbar-nav ms-auto" th:if="${session.role != null}">
-			<li class="nav-item"><span class="navbar-text me-3"
-				th:text="${session.displayName} + ' (' + ${session.role} + ')'"></span></li>
-			<li class="nav-item"><a class="nav-link" th:href="@{/logout}">Logout</a></li>
-		</ul>
+<nav th:replace="~{fragments/layout :: navbar('history')}"></nav>
+<main class="container">
+	<div class="d-flex justify-content-between align-items-center mb-3">
+		<h3 class="page-title">Transaction history</h3>
+		<a class="btn btn-primary" th:href="@{/}">+ Rent a car</a>
 	</div>
-</nav>
-<div class="container">
-	<h3>Transaction history</h3>
-		<div class="alert alert-success" th:if="${message}" th:text="${message}"></div>
-		<div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
-	<table class="table table-striped align-middle">
-		<thead><tr><th>ID</th><th>Car</th><th>Pickup</th><th>Return</th><th>Price</th><th>Status</th><th></th></tr></thead>
-		<tbody>
-		<tr th:each="r : ${rentals}">
-			<td th:text="${r.carRentId}"></td>
-			<td th:text="${r.carName}"></td>
-			<td th:text="${r.pickupDate}"></td>
-			<td th:text="${r.returnDate}"></td>
-			<td th:text="${#numbers.formatDecimal(r.rentPrice, 0, 'COMMA', 0, 'POINT')}"></td>
-			<td th:text="${r.status}"></td>
-			<td>
-				<form th:if="${r.status == 'Active'}" th:action="@{/customer/rentals/{id}/cancel(id=${r.carRentId})}"
-					method="post" onsubmit="return confirm('Cancel this transaction?');">
-					<button class="btn btn-sm btn-outline-danger">Cancel</button>
-				</form>
-				<form th:if="${r.status == 'Completed' and !reviewed.contains(r.carRentId)}"
-					th:action="@{/customer/rentals/{id}/review(id=${r.carRentId})}" method="post" class="d-flex gap-1">
-					<select name="reviewStar" class="form-select form-select-sm" style="width: 70px;">
-						<option th:each="i : ${#numbers.sequence(5, 1, -1)}" th:value="${i}" th:text="${i} + '★'"></option>
-					</select>
-					<input name="comment" class="form-control form-control-sm" placeholder="Comment" maxlength="500" required>
-					<button class="btn btn-sm btn-outline-primary">Review</button>
-				</form>
-				<span th:if="${reviewed.contains(r.carRentId)}" class="text-muted small">Reviewed</span>
-			</td>
-		</tr>
-		<tr th:if="${#lists.isEmpty(rentals)}"><td colspan="7" class="text-center text-muted">No transactions yet</td></tr>
-		</tbody>
-	</table>
-</div>
+	<div th:replace="~{fragments/layout :: alerts}"></div>
+	<div class="card card-body">
+		<table class="table table-striped align-middle datatable" data-order-col="2" data-order-dir="desc">
+			<thead><tr><th>ID</th><th>Car</th><th>Pickup</th><th>Return</th><th>Price</th><th>Status</th><th data-orderable="false">Review</th><th data-orderable="false"></th></tr></thead>
+			<tbody>
+			<tr th:each="r : ${rentals}">
+				<td th:text="${r.carRentId}"></td>
+				<td><a th:href="@{/cars/{id}(id=${r.carId})}" class="text-decoration-none" th:text="${r.carName}"></a></td>
+				<td th:text="${r.pickupDate}"></td>
+				<td th:text="${r.returnDate}"></td>
+				<td th:attr="data-order=${r.rentPrice}" th:text="${#numbers.formatDecimal(r.rentPrice, 0, 'COMMA', 0, 'POINT')}"></td>
+				<td><span class="badge"
+					th:classappend="${r.status == 'Active'} ? 'text-bg-primary' : (${r.status == 'Completed'} ? 'text-bg-success' : 'text-bg-secondary')"
+					th:text="${r.status}"></span></td>
+				<td>
+					<th:block th:if="${reviews.containsKey(r.carRentId)}">
+						<span th:replace="~{fragments/layout :: stars(${reviews.get(r.carRentId).reviewStar})}"></span>
+					</th:block>
+					<a th:if="${r.status == 'Completed' and !reviews.containsKey(r.carRentId)}" class="btn btn-sm btn-outline-primary"
+						th:href="@{/customer/rentals/{id}/review(id=${r.carRentId})}">Write review</a>
+					<span th:if="${r.status != 'Completed' and !reviews.containsKey(r.carRentId)}" class="text-muted small">After completion</span>
+				</td>
+				<td>
+					<form th:if="${r.status == 'Active'}" th:action="@{/customer/rentals/{id}/cancel(id=${r.carRentId})}"
+						method="post" onsubmit="return confirm('Cancel this transaction?');">
+						<button class="btn btn-sm btn-outline-danger">Cancel</button>
+					</form>
+				</td>
+			</tr>
+			</tbody>
+		</table>
+	</div>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+<th:block th:replace="~{fragments/layout :: datatables}"></th:block>
 </body>
 </html>

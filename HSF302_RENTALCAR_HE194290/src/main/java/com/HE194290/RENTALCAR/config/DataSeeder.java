@@ -15,10 +15,21 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 /** Tạo dữ liệu mẫu ở lần chạy đầu tiên (khi bảng còn trống). */
 @Component
 public class DataSeeder implements CommandLineRunner {
+
+	private static final String IMG = "https://upload.wikimedia.org/wikipedia/commons/thumb/";
+
+	/** Ảnh mẫu (Wikimedia Commons) theo tên xe seed. */
+	private static final Map<String, String> SAMPLE_IMAGES = Map.of(
+			"Toyota Vios", IMG + "2/25/Toyota_Vios_%28XP150%29_sedan_front_view.jpg/960px-Toyota_Vios_%28XP150%29_sedan_front_view.jpg",
+			"Toyota Fortuner", IMG + "6/66/2015_Toyota_Fortuner_%28New_Zealand%29.jpg/960px-2015_Toyota_Fortuner_%28New_Zealand%29.jpg",
+			"Honda City", IMG + "d/dd/Honda_City_2020.jpg/960px-Honda_City_2020.jpg",
+			"VinFast VF8", IMG + "5/58/VinFast_VF_8_DSC_8470.jpg/960px-VinFast_VF_8_DSC_8470.jpg",
+			"Ford Ranger", IMG + "2/28/Ford_Ranger_%28T6%2C_P703%29_Wildtrak_IMG_7320.jpg/960px-Ford_Ranger_%28T6%2C_P703%29_Wildtrak_IMG_7320.jpg");
 
 	private final AccountRepository accountRepository;
 	private final AccountService accountService;
@@ -37,6 +48,12 @@ public class DataSeeder implements CommandLineRunner {
 
 	@Override
 	public void run(String... args) {
+		// Tình trạng thuê giờ suy ra từ lịch đặt, nên xe cũ có status "Rented" được chuyển về Available
+		carRepository.findByStatus("Rented").forEach(c -> {
+			c.setStatus(Car.AVAILABLE);
+			carRepository.save(c);
+		});
+
 		if (!accountRepository.existsByEmail("admin@fucar.com")) {
 			Account admin = new Account();
 			admin.setAccountName("Administrator");
@@ -59,6 +76,14 @@ public class DataSeeder implements CommandLineRunner {
 					car("VinFast VF8", 2024, "Blue", 5, "Electric SUV", producers.get(2), "1500000"),
 					car("Ford Ranger", 2022, "Orange", 5, "Pickup truck", producers.get(3), "1000000")));
 		}
+
+		// Bổ sung ảnh mẫu cho xe seed chưa có ảnh (không đụng tới xe Admin đã tự nhập ảnh)
+		carRepository.findAll().stream()
+				.filter(c -> c.getImageUrl() == null && SAMPLE_IMAGES.containsKey(c.getCarName()))
+				.forEach(c -> {
+					c.setImageUrl(SAMPLE_IMAGES.get(c.getCarName()));
+					carRepository.save(c);
+				});
 
 		if (!accountRepository.existsByEmail("customer@fucar.com")) {
 			CustomerRequest f = new CustomerRequest();

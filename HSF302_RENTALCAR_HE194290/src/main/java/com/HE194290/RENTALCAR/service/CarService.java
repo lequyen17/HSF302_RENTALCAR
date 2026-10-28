@@ -4,13 +4,20 @@ import com.HE194290.RENTALCAR.dto.request.CarRequest;
 import com.HE194290.RENTALCAR.dto.response.CarProducerResponse;
 import com.HE194290.RENTALCAR.dto.response.CarResponse;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface CarService {
 
-	List<CarResponse> search(String keyword);
+	/** Dành cho Admin: toàn bộ xe, gồm cả xe Inactive. Tìm kiếm, sắp xếp, phân trang do DataTables xử lý ở trình duyệt. */
+	List<CarResponse> findAll();
 
-	List<CarResponse> findAvailable();
+	/**
+	 * Xe có thể thuê trong khoảng [start, end): không Inactive và không trùng lịch với giao dịch nào chưa hủy.
+	 * Nếu start/end null thì không lọc theo thời gian. Các tham số còn lại có thể null.
+	 */
+	List<CarResponse> findAvailable(LocalDate start, LocalDate end, String keyword, Integer producerId,
+			Integer minSeats);
 
 	CarResponse get(Integer id);
 

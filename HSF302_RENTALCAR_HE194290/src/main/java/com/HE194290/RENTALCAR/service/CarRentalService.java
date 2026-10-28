@@ -1,6 +1,7 @@
 package com.HE194290.RENTALCAR.service;
 
 import com.HE194290.RENTALCAR.dto.response.CarRentalResponse;
+import com.HE194290.RENTALCAR.dto.response.ReportResponse;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -13,8 +14,11 @@ public interface CarRentalService {
 
 	CarRentalResponse get(Integer id);
 
-	/** Báo cáo theo khoảng ngày nhận xe StartDate -> EndDate, sắp xếp giảm dần. */
-	List<CarRentalResponse> report(LocalDate start, LocalDate end);
+	/** Báo cáo theo khoảng ngày nhận xe StartDate -> EndDate (giao dịch sắp xếp giảm dần), kèm số liệu tổng hợp. */
+	ReportResponse report(LocalDate start, LocalDate end);
+
+	/** Xe có rảnh trong khoảng [start, end) hay không (không tính xe Inactive). */
+	boolean isCarAvailable(Integer carId, LocalDate start, LocalDate end);
 
 	/** Một khách thuê nhiều xe: mỗi xe là một dòng car_rental cùng khoảng ngày. */
 	List<CarRentalResponse> create(Integer customerId, List<Integer> carIds, LocalDate pickup, LocalDate ret);
@@ -25,8 +29,4 @@ public interface CarRentalService {
 	void cancelByCustomer(Integer rentId, Integer customerId);
 
 	void delete(Integer id);
-
-	void addReview(Integer rentId, Integer customerId, int star, String comment);
-
-	boolean isReviewed(Integer rentId);
 }

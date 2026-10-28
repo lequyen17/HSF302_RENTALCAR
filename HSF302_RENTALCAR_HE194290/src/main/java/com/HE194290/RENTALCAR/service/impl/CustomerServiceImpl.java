@@ -33,11 +33,8 @@ public class CustomerServiceImpl implements CustomerService {
 
 	@Override
 	@Transactional(readOnly = true)
-	public List<CustomerResponse> search(String keyword) {
-		List<Customer> customers = (keyword == null || keyword.isBlank())
-				? customerRepository.findAll()
-				: customerRepository.findByFullNameContainingIgnoreCase(keyword.trim());
-		return customers.stream().map(this::toDto).toList();
+	public List<CustomerResponse> findAll() {
+		return customerRepository.findAll().stream().map(this::toDto).toList();
 	}
 
 	@Override

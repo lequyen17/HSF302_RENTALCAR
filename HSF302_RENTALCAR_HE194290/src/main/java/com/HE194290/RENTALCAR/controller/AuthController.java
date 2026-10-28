@@ -27,20 +27,11 @@ public class AuthController {
 		this.customerService = customerService;
 	}
 
-	@GetMapping("/")
-	public String home(HttpSession session) {
-		String role = (String) session.getAttribute("role");
-		if (Account.ADMIN.equals(role)) {
-			return "redirect:/admin/cars";
-		}
-		if (Account.CUSTOMER.equals(role)) {
-			return "redirect:/customer/rent";
-		}
-		return "redirect:/login";
-	}
-
 	@GetMapping("/login")
-	public String loginForm() {
+	public String loginForm(@RequestParam(required = false) String required, Model model) {
+		if (required != null) {
+			model.addAttribute("error", "Please log in to continue");
+		}
 		return "login";
 	}
 
@@ -55,10 +46,16 @@ public class AuthController {
 		}
 		Account a = account.get();
 		HttpSession session = request.getSession(true);
+		String next = (String) session.getAttribute("nextUrl");
 		request.changeSessionId();
 		session.setAttribute("accountId", a.getAccountId());
 		session.setAttribute("role", a.getRole());
 		session.setAttribute("displayName", a.getAccountName());
+		session.removeAttribute("nextUrl");
+		// Quay lại trang khách đang định vào (ví dụ bấm "Rent" khi chưa đăng nhập)
+		if (Account.CUSTOMER.equals(a.getRole()) && next != null && next.startsWith("/customer")) {
+			return "redirect:" + next;
+		}
 		return "redirect:/";
 	}
 

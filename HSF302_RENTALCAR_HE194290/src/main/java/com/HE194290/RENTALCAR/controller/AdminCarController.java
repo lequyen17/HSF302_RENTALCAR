@@ -16,7 +16,7 @@ import java.util.List;
 @RequestMapping("/admin/cars")
 public class AdminCarController {
 
-	private static final List<String> STATUSES = List.of(Car.AVAILABLE, Car.RENTED, Car.INACTIVE);
+	private static final List<String> STATUSES = List.of(Car.AVAILABLE, Car.INACTIVE);
 
 	private final CarService carService;
 
@@ -25,9 +25,8 @@ public class AdminCarController {
 	}
 
 	@GetMapping
-	public String list(@RequestParam(required = false) String keyword, Model model) {
-		model.addAttribute("cars", carService.search(keyword));
-		model.addAttribute("keyword", keyword);
+	public String list(Model model) {
+		model.addAttribute("cars", carService.findAll());
 		return "admin/car-list";
 	}
 

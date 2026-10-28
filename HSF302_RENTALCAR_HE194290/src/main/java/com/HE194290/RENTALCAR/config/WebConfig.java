@@ -33,7 +33,11 @@ public class WebConfig implements WebMvcConfigurer {
 				boolean ok = path.startsWith("/admin") ? Account.ADMIN.equals(role)
 						: Account.CUSTOMER.equals(role);
 				if (!ok) {
-					response.sendRedirect(request.getContextPath() + "/login");
+					if ("GET".equals(request.getMethod()) && role == null) {
+						String query = request.getQueryString();
+						request.getSession(true).setAttribute("nextUrl", path + (query == null ? "" : "?" + query));
+					}
+					response.sendRedirect(request.getContextPath() + "/login?required");
 				}
 				return ok;
 			}

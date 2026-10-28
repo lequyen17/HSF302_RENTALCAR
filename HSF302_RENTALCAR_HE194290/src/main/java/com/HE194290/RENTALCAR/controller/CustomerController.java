@@ -2,9 +2,10 @@ package com.HE194290.RENTALCAR.controller;
 
 import com.HE194290.RENTALCAR.dto.request.CustomerRequest;
 import com.HE194290.RENTALCAR.dto.response.CustomerResponse;
+import com.HE194290.RENTALCAR.dto.response.ReviewResponse;
 import com.HE194290.RENTALCAR.service.CarRentalService;
-import com.HE194290.RENTALCAR.service.CarService;
 import com.HE194290.RENTALCAR.service.CustomerService;
+import com.HE194290.RENTALCAR.service.ReviewService;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -16,32 +17,39 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/customer")
 public class CustomerController {
 
 	private final CustomerService customerService;
-	private final CarService carService;
 	private final CarRentalService rentalService;
+	private final ReviewService reviewService;
 
-	public CustomerController(CustomerService customerService, CarService carService,
-			CarRentalService rentalService) {
+	public CustomerController(CustomerService customerService,
+			CarRentalService rentalService, ReviewService reviewService) {
 		this.customerService = customerService;
-		this.carService = carService;
 		this.rentalService = rentalService;
+		this.reviewService = reviewService;
 	}
 
 	private CustomerResponse current(HttpSession session) {
 		return customerService.getByAccountId((Integer) session.getAttribute("accountId"));
 	}
 
+	/**
+	 * Việc thuê xe thực hiện ngay trên trang chủ / trang chi tiết xe. Endpoint này chỉ còn để đưa khách về đúng chỗ,
+	 * và để đăng nhập xong thì quay lại (interceptor ghi nhớ URL /customer/rent khi khách chưa đăng nhập).
+	 */
 	@GetMapping("/rent")
-	public String rentForm(Model model) {
-		model.addAttribute("cars", carService.findAvailable());
-		return "customer/rent";
+	public String rentRedirect(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate pickupDate,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate returnDate,
+			@RequestParam(required = false) Integer carId, RedirectAttributes ra) {
+		if (pickupDate != null && returnDate != null) {
+			ra.addAttribute("pickupDate", pickupDate.toString());
+			ra.addAttribute("returnDate", returnDate.toString());
+		}
+		return carId != null ? "redirect:/cars/" + carId : "redirect:/";
 	}
 
 	@PostMapping("/rent")
@@ -55,17 +63,17 @@ public class CustomerController {
 			return "redirect:/customer/history";
 		} catch (IllegalArgumentException e) {
 			ra.addFlashAttribute("error", e.getMessage());
-			return "redirect:/customer/rent";
+			ra.addAttribute("pickupDate", pickupDate.toString());
+			ra.addAttribute("returnDate", returnDate.toString());
+			return "redirect:/";
 		}
 	}
 
 	@GetMapping("/history")
 	public String history(HttpSession session, Model model) {
-		var rentals = rentalService.findByCustomer(current(session).getCustomerId());
-		Set<Integer> reviewed = rentals.stream().map(r -> r.getCarRentId()).filter(rentalService::isReviewed)
-				.collect(Collectors.toSet());
-		model.addAttribute("rentals", rentals);
-		model.addAttribute("reviewed", reviewed);
+		Integer customerId = current(session).getCustomerId();
+		model.addAttribute("rentals", rentalService.findByCustomer(customerId));
+		model.addAttribute("reviews", reviewService.findByCustomerKeyedByRental(customerId));
 		return "customer/history";
 	}
 
@@ -80,17 +88,83 @@ public class CustomerController {
 		return "redirect:/customer/history";
 	}
 
-	@PostMapping("/rentals/{id}/review")
-	public String review(@PathVariable Integer id, @RequestParam int reviewStar, @RequestParam String comment,
-			HttpSession session, RedirectAttributes ra) {
+	// ---- Reviews: create / read / update / delete ----
+
+	@GetMapping("/reviews")
+	public String myReviews(HttpSession session, Model model) {
+		model.addAttribute("reviews", reviewService.findByCustomer(current(session).getCustomerId()));
+		return "customer/reviews";
+	}
+
+	@GetMapping("/rentals/{id}/review")
+	public String newReviewForm(@PathVariable Integer id, HttpSession session, Model model, RedirectAttributes ra) {
 		try {
-			rentalService.addReview(id, current(session).getCustomerId(), reviewStar, comment);
-			ra.addFlashAttribute("message", "Thank you for your review");
+			String carName = reviewService.carNameOfRental(id, current(session).getCustomerId());
+			return reviewForm(model, "Review " + carName, "/customer/rentals/" + id + "/review", 5, "");
 		} catch (IllegalArgumentException | IllegalStateException e) {
 			ra.addFlashAttribute("error", e.getMessage());
+			return "redirect:/customer/history";
 		}
-		return "redirect:/customer/history";
 	}
+
+	@PostMapping("/rentals/{id}/review")
+	public String createReview(@PathVariable Integer id, @RequestParam int reviewStar, @RequestParam String comment,
+			HttpSession session, Model model, RedirectAttributes ra) {
+		try {
+			reviewService.create(id, current(session).getCustomerId(), reviewStar, comment);
+			ra.addFlashAttribute("message", "Thank you for your review");
+			return "redirect:/customer/reviews";
+		} catch (IllegalArgumentException | IllegalStateException e) {
+			model.addAttribute("error", e.getMessage());
+			return reviewForm(model, "Review", "/customer/rentals/" + id + "/review", reviewStar, comment);
+		}
+	}
+
+	@GetMapping("/reviews/{id}/edit")
+	public String editReviewForm(@PathVariable Integer id, HttpSession session, Model model, RedirectAttributes ra) {
+		try {
+			ReviewResponse r = reviewService.getOwned(id, current(session).getCustomerId());
+			return reviewForm(model, "Edit review - " + r.getCarName(), "/customer/reviews/" + id + "/edit",
+					r.getReviewStar(), r.getComment());
+		} catch (IllegalArgumentException e) {
+			ra.addFlashAttribute("error", e.getMessage());
+			return "redirect:/customer/reviews";
+		}
+	}
+
+	@PostMapping("/reviews/{id}/edit")
+	public String updateReview(@PathVariable Integer id, @RequestParam int reviewStar, @RequestParam String comment,
+			HttpSession session, Model model, RedirectAttributes ra) {
+		try {
+			reviewService.update(id, current(session).getCustomerId(), reviewStar, comment);
+			ra.addFlashAttribute("message", "Review updated");
+			return "redirect:/customer/reviews";
+		} catch (IllegalArgumentException e) {
+			model.addAttribute("error", e.getMessage());
+			return reviewForm(model, "Edit review", "/customer/reviews/" + id + "/edit", reviewStar, comment);
+		}
+	}
+
+	@PostMapping("/reviews/{id}/delete")
+	public String deleteReview(@PathVariable Integer id, HttpSession session, RedirectAttributes ra) {
+		try {
+			reviewService.deleteByCustomer(id, current(session).getCustomerId());
+			ra.addFlashAttribute("message", "Review deleted");
+		} catch (IllegalArgumentException e) {
+			ra.addFlashAttribute("error", e.getMessage());
+		}
+		return "redirect:/customer/reviews";
+	}
+
+	private String reviewForm(Model model, String heading, String action, int star, String comment) {
+		model.addAttribute("heading", heading);
+		model.addAttribute("formAction", action);
+		model.addAttribute("star", star);
+		model.addAttribute("comment", comment);
+		return "customer/review-form";
+	}
+
+	// ---- Profile ----
 
 	@GetMapping("/profile")
 	public String profile(HttpSession session, Model model) {

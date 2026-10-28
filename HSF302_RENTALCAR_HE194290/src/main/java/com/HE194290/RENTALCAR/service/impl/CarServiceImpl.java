@@ -8,11 +8,17 @@ import com.HE194290.RENTALCAR.entity.CarProducer;
 import com.HE194290.RENTALCAR.repository.CarProducerRepository;
 import com.HE194290.RENTALCAR.repository.CarRentalRepository;
 import com.HE194290.RENTALCAR.repository.CarRepository;
+import com.HE194290.RENTALCAR.repository.ReviewRepository;
 import com.HE194290.RENTALCAR.service.CarService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @Transactional
@@ -21,33 +27,44 @@ public class CarServiceImpl implements CarService {
 	private final CarRepository carRepository;
 	private final CarProducerRepository producerRepository;
 	private final CarRentalRepository carRentalRepository;
+	private final ReviewRepository reviewRepository;
 
 	public CarServiceImpl(CarRepository carRepository, CarProducerRepository producerRepository,
-			CarRentalRepository carRentalRepository) {
+			CarRentalRepository carRentalRepository, ReviewRepository reviewRepository) {
 		this.carRepository = carRepository;
 		this.producerRepository = producerRepository;
 		this.carRentalRepository = carRentalRepository;
+		this.reviewRepository = reviewRepository;
 	}
 
 	@Override
 	@Transactional(readOnly = true)
-	public List<CarResponse> search(String keyword) {
-		List<Car> cars = (keyword == null || keyword.isBlank())
-				? carRepository.findAll()
-				: carRepository.findByCarNameContainingIgnoreCase(keyword.trim());
-		return cars.stream().map(this::toDto).toList();
+	public List<CarResponse> findAll() {
+		return toDtos(carRepository.findAll());
 	}
 
 	@Override
 	@Transactional(readOnly = true)
-	public List<CarResponse> findAvailable() {
-		return carRepository.findByStatus(Car.AVAILABLE).stream().map(this::toDto).toList();
+	public List<CarResponse> findAvailable(LocalDate start, LocalDate end, String keyword, Integer producerId,
+			Integer minSeats) {
+		Set<Integer> booked = (start != null && end != null)
+				? new HashSet<>(carRentalRepository.findBookedCarIds(start, end))
+				: Set.of();
+		String kw = keyword == null ? "" : keyword.trim().toLowerCase();
+		List<Car> cars = carRepository.findAll().stream()
+				.filter(c -> !Car.INACTIVE.equals(c.getStatus()))
+				.filter(c -> !booked.contains(c.getCarId()))
+				.filter(c -> kw.isEmpty() || c.getCarName().toLowerCase().contains(kw))
+				.filter(c -> producerId == null || c.getProducer().getProducerId().equals(producerId))
+				.filter(c -> minSeats == null || c.getCapacity() >= minSeats)
+				.toList();
+		return toDtos(cars);
 	}
 
 	@Override
 	@Transactional(readOnly = true)
 	public CarResponse get(Integer id) {
-		return toDto(find(id));
+		return toDtos(List.of(find(id))).get(0);
 	}
 
 	@Override
@@ -64,6 +81,7 @@ public class CarServiceImpl implements CarService {
 		r.setImportDate(c.getImportDate());
 		r.setProducerId(c.getProducer().getProducerId());
 		r.setRentPrice(c.getRentPrice());
+		r.setImageUrl(c.getImageUrl());
 		r.setStatus(c.getStatus());
 		return r;
 	}
@@ -91,6 +109,8 @@ public class CarServiceImpl implements CarService {
 		car.setProducer(producerRepository.findById(request.getProducerId())
 				.orElseThrow(() -> new IllegalArgumentException("Producer not found")));
 		car.setRentPrice(request.getRentPrice());
+		car.setImageUrl(request.getImageUrl() == null || request.getImageUrl().isBlank() ? null
+				: request.getImageUrl().trim());
 		car.setStatus(request.getStatus());
 		return toDto(carRepository.save(car));
 	}
@@ -114,6 +134,23 @@ public class CarServiceImpl implements CarService {
 		return carRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Car not found: " + id));
 	}
 
+	/** Chuyển sang DTO kèm điểm đánh giá trung bình (một query cho cả danh sách). */
+	private List<CarResponse> toDtos(List<Car> cars) {
+		Map<Integer, Object[]> ratings = new HashMap<>();
+		for (Object[] row : reviewRepository.ratingByCar()) {
+			ratings.put((Integer) row[0], row);
+		}
+		return cars.stream().map(c -> {
+			CarResponse r = toDto(c);
+			Object[] row = ratings.get(c.getCarId());
+			if (row != null) {
+				r.setAvgRating(((Number) row[1]).doubleValue());
+				r.setReviewCount(((Number) row[2]).longValue());
+			}
+			return r;
+		}).toList();
+	}
+
 	private CarResponse toDto(Car c) {
 		CarResponse r = new CarResponse();
 		r.setCarId(c.getCarId());
@@ -126,6 +163,7 @@ public class CarServiceImpl implements CarService {
 		r.setProducerId(c.getProducer().getProducerId());
 		r.setProducerName(c.getProducer().getProducerName());
 		r.setRentPrice(c.getRentPrice());
+		r.setImageUrl(c.getImageUrl());
 		r.setStatus(c.getStatus());
 		return r;
 	}
